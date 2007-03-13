@@ -48,8 +48,10 @@ create table ADDRESS (
 	PostalCode NVARCHAR(10) NULL,
 	CountryCode NVARCHAR(10) NULL,
 
+	TempID INT NOT NULL DEFAULT 1
+	
 	constraint ADDRESS_PK primary key clustered 
-	( AddressId asc ) with (IGNORE_DUP_KEY = off) on [PRIMARY]
+	( AddressId ASC, TempID ASC ) with (IGNORE_DUP_KEY = off) on [PRIMARY]
 ) ON [PRIMARY]
 GO
 
@@ -106,7 +108,7 @@ GO
 ----------------------------------------------------
 -- Test Scripts
 ----------------------------------------------------
-
+TRUNCATE TABLE [DataAudit]
 -- Test "update"
 update ADDRESS SET City = 'New City 4' where AddressID = 4
 
@@ -127,6 +129,12 @@ values
     '10001',
     'CI1'
 )
+
+update ADDRESS SET TempId = '3' where AddressID = 4
+
+update ADDRESS SET [PostalCode] = null where AddressID = 4
+
+update ADDRESS SET [PostalCode] = 'My Code', TempId = '4' where AddressID = 4
 
 -- Test "delete"
 delete from address where AddressID = 8

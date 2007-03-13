@@ -41,7 +41,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Test Scripts\Test.sql">
+    <Content Include="Scripts\Setup.sql">
       <SubType>Content</SubType>
     </Content>
   </ItemGroup>
@@ -52,4 +52,9 @@
   <Target Name="AfterBuild">
   </Target>
   -->
+  <ItemGroup>
+    <Content Include="Scripts\Test.sql">
+      <SubType>Content</SubType>
+    </Content>
+  </ItemGroup>
 </Project>
