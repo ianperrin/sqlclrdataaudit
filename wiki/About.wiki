@@ -1,0 +1,21 @@
+#summary All about the SQL CLR DataAudit.
+
+= SQL CLR DataAudit =
+
+All about the SQL CLR DataAudit.
+
+
+== Install ==
+
+To use the trigger on a test database:
+  * Open the project in Visual Studio 2005
+  * Build the project
+  * Open the SQL Scripts in SQL Server Management Studio
+  * Create a new empty database
+  * Change the project path in Test.sql
+  * Run both scripts
+
+
+
+
+
