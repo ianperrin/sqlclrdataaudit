@@ -18,7 +18,7 @@ CREATE TABLE DataAudit (
 
 	-- required info for all auditing operations
 	TableName SYSNAME NOT NULL,
-	RowId BIGINT NOT NULL,
+	RowId XML NOT NULL,
 	Operation NVARCHAR(10) NOT NULL,
 	OccurredAt DATETIME NOT NULL,
 	PerformedBy NVARCHAR(50) NOT NULL,

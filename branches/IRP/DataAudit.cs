@@ -64,7 +64,7 @@ public partial class Triggers
       EmitDebugMessage("Load AUDIT schema for insertion");
 #endif
 
-      SqlDataAdapter auditAdapter = new SqlDataAdapter("select * from audit where 1 = 0", connection); 
+      SqlDataAdapter auditAdapter = new SqlDataAdapter("SELECT * FROM DataAudit WHERE 1 = 0", connection); 
       DataTable auditTable = new DataTable(); 
       auditAdapter.FillSchema(auditTable, SchemaType.Source); 
       SqlCommandBuilder auditCommandBuilder = new SqlCommandBuilder(auditAdapter);
@@ -78,22 +78,52 @@ public partial class Triggers
       DataRow insertedRow = null; 
       if (insertedTable.Rows.Count > 0) 
       { 
-        insertedRow = insertedTable.Rows[0]; 
+        insertedRow = insertedTable.Rows[0];
         tableName = DeriveTableNameFromKeyFieldName(insertedTable.Columns[0].ColumnName); 
       } 
       DataRow deletedRow = null; 
       if (deletedTable.Rows.Count > 0) 
       { 
-        deletedRow = deletedTable.Rows[0]; 
+        deletedRow = deletedTable.Rows[0];
         tableName = DeriveTableNameFromKeyFieldName(deletedTable.Columns[0].ColumnName); 
       }
-
+      
       // get the current database user
-      // TODO: cater for windows authentication "SELECT SYSTEM_USER"
-      SqlCommand currentUserCmd = new SqlCommand("SELECT CURRENT_USER", connection); 
+      SqlCommand currentUserCmd = new SqlCommand("SELECT SYSTEM_USER", connection); 
       string currentUser = currentUserCmd.ExecuteScalar().ToString();
 
-            // Perform different audits based on the type of action.
+      // First Attempt to dynamically get primary key data
+      // TODO: Optimise!!!!
+      #region GetPrimaryKey
+
+      // get the primary key xml from trigger tables
+      string sql = @"SELECT COLUMN_NAME" + Environment.NewLine +
+                    @"FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS pk " + Environment.NewLine +
+                    @"JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE c ON c.TABLE_NAME = pk.TABLE_NAME AND c.CONSTRAINT_NAME = pk.CONSTRAINT_NAME" + Environment.NewLine +
+                    @"WHERE pk.TABLE_NAME = '" + tableName + "' AND CONSTRAINT_TYPE = 'PRIMARY KEY'";
+
+      SqlCommand pkCmd = new SqlCommand(sql, connection);
+      SqlDataReader reader = pkCmd.ExecuteReader(CommandBehavior.CloseConnection);
+      string pkColumnName = string.Empty;
+      string pkColumnValue = string.Empty;
+      string pkColumnXml = string.Empty;
+      while (reader.Read())
+      {
+        pkColumnName = reader[0].ToString();
+        if (insertedRow != null)
+          pkColumnValue = insertedRow[insertedTable.Columns[pkColumnName].Ordinal].ToString();
+        else
+          pkColumnValue = deletedRow[deletedTable.Columns[pkColumnName].Ordinal].ToString();
+
+        pkColumnXml += string.Format("<Column Name=\"{0}\">{1}</Column>", pkColumnName, pkColumnValue);
+      }
+      if (pkColumnXml != string.Empty) pkColumnXml = string.Format("<PrimaryKey>{0}</PrimaryKey>", pkColumnXml);
+      reader.Close();
+
+      #endregion
+
+
+      // Perform different audits based on the type of action.
             switch (context.TriggerAction)
             {
               case TriggerAction.Update:
@@ -123,13 +153,13 @@ public partial class Triggers
                       DataRow auditRow = auditTable.NewRow();
 
                       // populate fields common to all audit records
-                      Int64 rowId = ((Int64)(insertedRow[0]));
+                      //Int64 rowId = ((Int64)(insertedRow[0]));
                       // use "Inserted.TableName" when Microsoft fixes the CLR to supply it
-                      WriteCommonAuditData(auditRow, tableName, rowId, currentUser, "UPDATE");
+                      WriteCommonAuditData(auditRow, tableName, pkColumnXml, currentUser, "UPDATE");
                       // write update-specific fields
                       auditRow["FieldName"] = column.ColumnName;
-                      auditRow["OldValue"] = deletedRow[column.Ordinal].ToString();
-                      auditRow["NewValue"] = insertedRow[column.Ordinal].ToString();
+                      auditRow["OldValue"] = (deletedRow[column.Ordinal]==DBNull.Value ? null : deletedRow[column.Ordinal].ToString());
+                      auditRow["NewValue"] = (insertedRow[column.Ordinal]==DBNull.Value ? null : insertedRow[column.Ordinal].ToString());
 
                       // insert the new row into the audit table
                       auditTable.Rows.InsertAt(auditRow, 0);
@@ -153,9 +183,16 @@ public partial class Triggers
                   DataRow auditRow = auditTable.NewRow();
 
                   // populate fields common to all audit records
-                  Int64 rowId = ((Int64)(insertedRow[0]));
+                  //Int64 rowId = ((Int64)(insertedRow[0]));
                   // use "Inserted.TableName" when Microsoft fixes the CLR to supply it
-                  WriteCommonAuditData(auditRow, tableName, rowId, currentUser, "INSERT");
+                  WriteCommonAuditData(auditRow, tableName, pkColumnXml, currentUser, "INSERT");
+
+                  if (insertedTable.PrimaryKey != null)
+                  {
+                    EmitDebugMessage("Get PrimaryKey");
+                    //auditRow["OldValue"] = context.EventData.ToString();
+                    EmitDebugMessage(insertedTable.PrimaryKey.Length.ToString());
+                  }
 
                   // insert the new row into the audit table
                   auditTable.Rows.InsertAt(auditRow, 0);
@@ -176,9 +213,9 @@ public partial class Triggers
                   DataRow auditRow = auditTable.NewRow();
 
                   // populate fields common to all audit records
-                  Int64 rowId = ((Int64)(deletedRow[0]));
+                  //Int64 rowId = ((Int64)(deletedRow[0]));
                   // use "Inserted.TableName" when Microsoft fixes the CLR to supply it
-                  WriteCommonAuditData(auditRow, tableName, rowId, currentUser, "DELETE");
+                  WriteCommonAuditData(auditRow, tableName, pkColumnXml, currentUser, "DELETE");
 
                   // insert the new row into the audit table
                   auditTable.Rows.InsertAt(auditRow, 0);
@@ -215,6 +252,7 @@ public partial class Triggers
 
   #region Helper Methods
 
+
   /// <summary>
   /// Write data into the fields of an Audit table row that is common to all types of audit activities.
   /// </summary>
@@ -223,7 +261,7 @@ public partial class Triggers
   /// <param name="RowId">The row id.</param>
   /// <param name="CurrentUser">The current user.</param>
   /// <param name="Operation">The operation.</param>
-  private static void WriteCommonAuditData(DataRow auditRow, string tableName, Int64 rowId, string currentUser, string operation)
+  private static void WriteCommonAuditData(DataRow auditRow, string tableName, string rowId, string currentUser, string operation)
   {
     auditRow["TableName"] = tableName;
     auditRow["RowId"] = rowId;
@@ -233,12 +271,15 @@ public partial class Triggers
   }
 
   /// <summary>
-  /// SQL CLR does not deliver the proper table name from either InsertedTable.TableName 
+  /// Returns the Table Name from the Key Field Name.
+  /// </summary>
+  /// <remarks>
+  /// SQL CLR does not deliver the proper table name from either InsertedTable.TableName
   /// or DeletedTable.TableName, so we must use a substitute based on our key naming
   /// convention. We assume that in each table, the KeyFieldName = TableName + "Id"
   /// Remove this routine and its uses as soon as we can get the table name from the CLR.
-  /// </summary>
-  /// <param name="KeyFieldName">Name of the key field.</param>
+  /// </remarks>
+  /// <param name="keyFieldName">Name of the key field.</param>
   /// <returns></returns>
   private static string DeriveTableNameFromKeyFieldName(string keyFieldName)
   {
