@@ -136,10 +136,10 @@ public partial class Triggers
                   foreach (DataColumn column in insertedTable.Columns)
                   {
                     // ALTERNATIVE CODE to compare values and record only if they are different:
-                    // if (!DeletedRow.Item(Column.Ordinal).Equals(InsertedRow.Item(Column.Ordinal)))
+                    if (!deletedRow[column.Ordinal].Equals(insertedRow[column.Ordinal]))
                     
                     // This code records any attempt to update, whether the new value is different or not.
-                    if (context.IsUpdatedColumn(column.Ordinal))
+                    //if (context.IsUpdatedColumn(column.Ordinal))
                     {
                       // DEBUG output indicating field change
 #if DEBUG
@@ -187,12 +187,14 @@ public partial class Triggers
                   // use "Inserted.TableName" when Microsoft fixes the CLR to supply it
                   WriteCommonAuditData(auditRow, tableName, pkColumnXml, currentUser, "INSERT");
 
+#if DEBUG
                   if (insertedTable.PrimaryKey != null)
                   {
                     EmitDebugMessage("Get PrimaryKey");
                     //auditRow["OldValue"] = context.EventData.ToString();
                     EmitDebugMessage(insertedTable.PrimaryKey.Length.ToString());
                   }
+#endif
 
                   // insert the new row into the audit table
                   auditTable.Rows.InsertAt(auditRow, 0);

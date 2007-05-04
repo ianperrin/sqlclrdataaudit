@@ -9,7 +9,7 @@
     <ProjectGuid>{D8EFAA95-D74C-4D1E-A3F4-2562F1C0C9DE}</ProjectGuid>
     <OutputType>Library</OutputType>
     <NoStandardLibraries>false</NoStandardLibraries>
-    <AssemblyName>DataAudit</AssemblyName>
+    <AssemblyName>BanksSadler.SqlServer.Triggers.DataAudit</AssemblyName>
     <RootNamespace>DataAudit</RootNamespace>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
